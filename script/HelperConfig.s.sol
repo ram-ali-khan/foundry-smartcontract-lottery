@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import {Script} from "forge-std/Script.sol";
 import {VRFCoordinatorV2Mock} from "../lib/chainlink-brownie-contracts/contracts/src/v0.8/mocks/VRFCoordinatorV2Mock.sol";
+import {LinkToken} from "../test/mocks/LinkToken.sol";
 
 contract HelperConfig is Script {
     // since we need to write configuration repeatedly for all networks we can use a struct
@@ -13,6 +14,7 @@ contract HelperConfig is Script {
         bytes32 gasLane;
         uint64 subscriptionId;
         uint32 callbackGasLimit;
+        address link;                    // added later for fundSubscription    // address of smart contract that manages the 'LINK token' (native cryptocurrency of chainlink network) on a specific blockchain
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -32,8 +34,9 @@ contract HelperConfig is Script {
             interval: 30,                     // meri mrzi
             vrfCoordinator: 0x8103B0A8A00be2DDC778e6e7eaa21791Cd364625,                          // https://docs.chain.link/vrf/v2/subscription/supported-networks
             gasLane: 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c,        // gas lane  = key hash     //https://docs.chain.link/vrf/v2/subscription/supported-networks
-            subscriptionId: 0,                // will update this with our subId
-            callbackGasLimit: 500000          // meri mrzi 
+            subscriptionId: 1893,             // will update this with our subId    //1893 is patrick's id
+            callbackGasLimit: 500000,         // meri mrzi 
+            link: 0x779877A7B0D9E8603169DdbD7836e478b4624789                               // https://docs.chain.link/resources/link-token-contracts
         });
     }
 
@@ -52,6 +55,7 @@ contract HelperConfig is Script {
         
         vm.startBroadcast();
         VRFCoordinatorV2Mock mockVRFCoordinator = new VRFCoordinatorV2Mock(baseFee, gasPricelink);       // the two inputs for VRFCoordinatorV2Mock are: _baseFee (flat fee it takes) and _gasPriceLink (fees for every gas used in form of LINK tokens)
+        LinkToken link = new LinkToken();       //added later       // using this below to create mock link token
         vm.stopBroadcast();
         // 2. will use this new contract address in below constructor
 
@@ -59,10 +63,11 @@ contract HelperConfig is Script {
         return NetworkConfig({
             enteranceFee: 0.01 ether,        // meri mrzi
             interval: 30,                    // meri mrzi 
-            vrfCoordinator: address(mockVRFCoordinator),
+            vrfCoordinator: address(mockVRFCoordinator), 
             gasLane: 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c,        // gas lane for mock doesn't matter so we can leave it like this i.e., same as in above function
             subscriptionId: 0,               //our script will add this 
-            callbackGasLimit: 500000         // meri mrzi
+            callbackGasLimit: 500000,         // meri mrzi
+            link: address(link)
         });
     }
 

@@ -28,12 +28,13 @@ contract RaffleTest is Test{
     bytes32 gasLane;
     uint64 subscriptionId;
     uint32 callbackGasLimit;
+    address link;
 
     function setUp() external {
         DeployRaffle deployRaffle = new DeployRaffle();
         (raffle, helperConfig) = deployRaffle.run();
 
-        (enteranceFee, interval, vrfCoordinator, gasLane, subscriptionId, callbackGasLimit) = helperConfig.activeNetworkConfig();
+        (enteranceFee, interval, vrfCoordinator, gasLane, subscriptionId, callbackGasLimit, link) = helperConfig.activeNetworkConfig();
     
     
         vm.deal(PLAYER , STARTING_USER_BALANCE);            // why did we write it inside setup fn ??  bcoz we want to give player money before every test. It ensures that all tests start from a clean, predefined state.
@@ -46,6 +47,8 @@ contract RaffleTest is Test{
     function testRaffleInitializesInOpenState() public view{
         assert(raffle.getRaffleState() == Raffle.RaffleState.OPEN);      //wierd: to acess value of enum >> Raffle.RaffleState.OPEN
     }
+
+
 
     ////////////////////////////////////////
     ////// enter raffle ////////////////////
@@ -74,7 +77,7 @@ contract RaffleTest is Test{
     function testEmitsEventsOnEnterance() public{
         vm.prank(PLAYER);
 
-        vm.expectEmit(true, false, false, false, address(raffle));        // (cheatcode) : expects the event in 'next line' to be emited when the transaction in 'next to next line' happens
+        vm.expectEmit(true, false, false, false, address(raffle));        // (cheatcode) : expects the 'event in next line' to be emited when the transaction in 'next to next line' happens
         emit EnteredRaffle(PLAYER);
 
         raffle.enterRaffle{value: enteranceFee}();
@@ -88,8 +91,8 @@ contract RaffleTest is Test{
         raffle.enterRaffle{value:enteranceFee}();      // entered raffle in open state
         vm.warp(block.timestamp + interval + 1);       // making the paramter of checkupkeep true                  // cheatcode: warp() is a cheatcode that allows you to warp the blockchain to a specific timestamp.
         vm.roll(block.number + 1);                     // making the paramter of checkupkeep true                  // cheatcode: roll() is a cheatcode that allows you to advance the blockchain to a specific block.
-        raffle.performUpKeep;                          // putting rafffle in closed state
-
+        raffle.performUpKeep("");                      // putting rafffle in closed state
+        
 
         //Act  /Assert
         vm.expectRevert(Raffle.Raffle_NotOpen.selector);   
@@ -97,8 +100,10 @@ contract RaffleTest is Test{
         raffle.enterRaffle{value: enteranceFee}();     // trying to enter in calculating state. should revert. test will pass
     }
 
+    // earlier this test failed due to subscriptionID issues (why? error said raffle not added as a consumer to subscription)
+    // now passes. 
 
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // the above test failed at this point due to subId issues. commintted code in this codition , later made the subId changes//
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    
 }
