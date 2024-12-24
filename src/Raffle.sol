@@ -74,6 +74,7 @@ contract Raffle is VRFConsumerBaseV2{
 
     event EnteredRaffle(address indexed player);
     event WinnerPicked(address indexed winner);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
 
 
@@ -187,6 +188,9 @@ contract Raffle is VRFConsumerBaseV2{
             NUMBER_WORDS
         );
         
+        // quiz....is this redundant? if yes then why this event ??
+        // yes it is redundant bcoz this requestId has already been emitted to logs in vrfcoordinator contract in the event named RandomWordsRequested.  (In actual chainlink works on basis of these events or logs only)
+        emit RequestedRaffleWinner(requestId);
     }
 
 

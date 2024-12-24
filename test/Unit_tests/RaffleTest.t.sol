@@ -5,6 +5,8 @@ import {Test, console} from "../../lib/forge-std/src/Test.sol";
 import {Raffle} from "../../src/Raffle.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {DeployRaffle} from "../../script/DeployRaffle.s.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {VRFCoordinatorV2Mock} from "../../lib/chainlink-brownie-contracts/contracts/src/v0.8/mocks/VRFCoordinatorV2Mock.sol";
 
 contract RaffleTest is Test{
     //COLLECTING THE RAW MATERIAL FOR TESTING:
@@ -105,5 +107,210 @@ contract RaffleTest is Test{
 
 
 
+    //////////////////////////////////////////////////////////////////
+    ////////////////////// checkUpKeep  //////////////////////////////
+    //////////////////////////////////////////////////////////////////
     
+
+    function testCheckUpkeepReturnsFalseIfIthasnoBalance() public {
+        //Arrange  
+        // make all the paramter true except balance so test it 
+        vm.warp(block.timestamp + interval + 1);
+        vm.roll(block.number + 1);                      // made timepassed variable true
+
+        //Act 
+        (bool upKeepNeeded, ) = raffle.checkUpKeep("");
+
+        //Assert
+        assert(!upKeepNeeded);
+
+    }
+
+    function testCheckUpkeepReturnsFalseIfRaffleNotOpen() public  {
+        //arrange
+        // make all the paramter true except openstate so test it 
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: enteranceFee}();      // now it has players and balance
+        vm.warp(block.timestamp + interval + 1);
+        vm.roll(block.number + 1);                      // now enoughtimehas passed
+        raffle.performUpKeep("");                      // but made the state closed (only this parameter is false)
+
+        //Act 
+        (bool upKeepNeeded, ) = raffle.checkUpKeep("");
+
+        //assert
+        assert(!upKeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsFalseIfEnoughTimeHasnotpassed() public {
+        //Arrange
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: enteranceFee}();      // now it has players and balance and open state
+        vm.warp(block.timestamp + interval - 1);        // now enoughtimehas not passed
+
+        //Act
+        (bool upKeepNeeded, ) = raffle.checkUpKeep("");
+
+        //Assert
+        assert(!upKeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsTrueWhenparametersaregood()  public{
+        //arrange
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: enteranceFee}();      // now it has players and balance and open state
+        vm.warp(block.timestamp + interval + 1);       
+        vm.roll(block.number + 1);                      // now enoughtimehas passed
+
+        //Act
+        (bool upKeepNeeded, ) = raffle.checkUpKeep("");
+
+        //Assert
+        assert(upKeepNeeded);
+    }
+
+
+
+
+    ///////////////////////////////////////////////////////////
+    //////////// perfom up keep //////////////////////////////
+    ///////////////////////////////////////////////////////////
+
+
+    function testperformUpKeepCanOnlyRunifCheckUpkeepIsTrue() public {
+        //arrange
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: enteranceFee}();      // now it has players and balance and open state
+        vm.warp(block.timestamp + interval + 1);       
+        vm.roll(block.number + 1);                      // now enoughtimehas passed
+
+        //Act /Assert
+        raffle.performUpKeep("");          // *******  this is equivalent to:  dont expect revert      ********
+
+    }
+
+    function testperformUpKeepRevertsifCheckUpkeepIsFalse() public {
+        // at this moment the raffle is deployed but no player has entered i.e. checkUpkeep is false
+        
+        /*   method 1 to write this test:
+
+        vm.expectRevert(Raffle.Raffle_upKeepNotNeeded.selector);             
+        raffle.performUpKeep("");
+        */
+        
+        // **** better method: revert with parameters value
+
+        uint256 currentBalance = 0;
+        uint256 numPlayers = 0;
+        uint256 raffleState =0; 
+
+        vm.expectRevert(abi.encodeWithSelector(Raffle.Raffle_upKeepNotNeeded.selector, currentBalance, numPlayers, raffleState));
+        raffle.performUpKeep("");
+    }
+
+    modifier upKeepParametersMadeTrue{
+        vm.prank(PLAYER);
+        raffle.enterRaffle{value: enteranceFee}();      // now it has players and balance and open state
+        vm.warp(block.timestamp + interval + 1);       
+        vm.roll(block.number + 1);                      // now enoughtimehas passed
+        _;
+    }
+
+    // what if I need to test using the output of an event ??
+    function testPerformUpkeepEmitsRequestId() public upKeepParametersMadeTrue{
+        // act
+        vm.recordLogs();                                        // cheatcode : tells the vm to start recording all the emitted events
+        raffle.performUpKeep("");               // here emitting events 
+        Vm.Log[] memory entries  = vm.getRecordedLogs();        // cheatcode : get the recorded events
+        bytes32 requestId = entries[1].topics[1];               // many logs are stored in the entries array // many ways to find out our wanted log // here we just know it is 2nd log 
+                                                                // topics inside the event start from index 1 bcoz at index 0 is the event itself
+        
+        //assert
+        assert( uint256(requestId) > 0 );
+
+    }
+    
+    function testPerformUpkeepUpdatesRaffleState() public upKeepParametersMadeTrue{
+        //act
+        raffle.performUpKeep("");
+        Raffle.RaffleState rState = raffle.getRaffleState();
+
+        //assert
+        assert(uint256(rState) == 1);
+    }
+
+
+    ////////////////////////////////////////////////////////////////////
+    ///////////// fullfill random words ////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////   fulfillRandomWords is called by the VRF coordinator in real environment as told during automation.   //////////
+    ////////   but for testing on local chain, we will ourself become vrfcoordinator using the vrfcoordinatormock   //////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    /************************************************************************************
+    
+    function testFulfilRandomWordsCanOnlyRunIfPerformUpkeepIsTrue() public upKeepParametersMadeTrue{
+        
+        expectRevert("nonexistent request"); 
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(0, address(raffle));
+
+        expectRevert("nonexistent request"); 
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(1, address(raffle));
+
+        expectRevert("nonexistent request"); 
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(2, address(raffle));
+
+    }
+   
+    *****************************************************************************
+       FUZZ TEST : rather than testing for all requestId we can write a FUZZ test where foundry itself tests by giving random values to requestId
+    *********************************************************************************/
+
+    function testFulfilRandomWordsCanOnlyRunIfPerformUpkeepIsTrue(uint256 randomRequestId) public upKeepParametersMadeTrue{
+        
+        vm.expectRevert("nonexistent request"); 
+        // now performipkeep is not ran so now if vrfcoordinator tries to run the fullfillrandomwords it will revert
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords(randomRequestId, address(raffle));                      // this fulfillRandomWords function is inside the vrfcoordinator contract
+    }
+
+
+    //testing almost complete fulfillRandomWords function in one test:
+    function testfulfillRandomWordsPicksAwinnerResetsAndSendsMoney() public{
+        
+        //Arrange players
+        uint256 totalEntrants = 5;
+        uint256 startingIndex = 0;
+        for(uint256 i = startingIndex; i < totalEntrants; i++){
+            address player = address(uint160(i + 1));                                                       // i+1 bcoz we want all address be non zero         
+            hoax(player, STARTING_USER_BALANCE);              // cheatcode for prank plus deal
+            raffle.enterRaffle{value: enteranceFee}();
+        }
+
+        uint256 startingTimeStamp = raffle.getLastTimeStamp();
+        uint256 prize = 5*enteranceFee;
+
+
+        //Act : just running the fulfillRandomWords function
+        vm.warp(block.timestamp + interval + 1);       
+        vm.roll(block.number + 1);                      // upkeep done 
+
+        vm.recordLogs();
+        raffle.performUpKeep("");                           
+        Vm.Log[] memory entries  = vm.getRecordedLogs();    
+        bytes32 requestId = entries[1].topics[1];                 //performupkeep done
+        
+        VRFCoordinatorV2Mock(vrfCoordinator).fulfillRandomWords (uint256(requestId), address(raffle));        //fulfillrandomwords done
+
+
+        //Assert  : checking if fulfillRandomWords function does the tasks assigned in it
+        assert(uint256(raffle.getRaffleState()) == 0);
+        assert(raffle.getRecentWinner() != address(0));
+        assert(raffle.getNumberOfPlayers() == 0);
+        assert(raffle.getLastTimeStamp() > startingTimeStamp);
+        assert(raffle.getRecentWinner().balance == STARTING_USER_BALANCE - enteranceFee + prize);
+    
+    }
+
+
 }
