@@ -31,12 +31,13 @@ contract RaffleTest is Test{
     uint64 subscriptionId;
     uint32 callbackGasLimit;
     address link;
+    uint256 deployerKey;
 
     function setUp() external {
-        DeployRaffle deployRaffle = new DeployRaffle();
-        (raffle, helperConfig) = deployRaffle.run();
+        DeployRaffle deployer = new DeployRaffle();
+        (raffle, helperConfig) = deployer.run();
 
-        (enteranceFee, interval, vrfCoordinator, gasLane, subscriptionId, callbackGasLimit, link) = helperConfig.activeNetworkConfig();
+        (enteranceFee, interval, vrfCoordinator, gasLane, subscriptionId, callbackGasLimit, link, deployerKey) = helperConfig.activeNetworkConfig();
     
     
         vm.deal(PLAYER , STARTING_USER_BALANCE);            // why did we write it inside setup fn ??  bcoz we want to give player money before every test. It ensures that all tests start from a clean, predefined state.
@@ -216,7 +217,7 @@ contract RaffleTest is Test{
         _;
     }
 
-    // what if I need to test using the output of an event ??
+    // what if I need to test using the output of an event ??  >> recordLogs
     function testPerformUpkeepEmitsRequestId() public upKeepParametersMadeTrue{
         // act
         vm.recordLogs();                                        // cheatcode : tells the vm to start recording all the emitted events
@@ -240,6 +241,15 @@ contract RaffleTest is Test{
     }
 
 
+
+
+    //this below modifier when added to below tests it will skip those tests when tested on real environment
+    modifier skipInCaseOfFork{
+        if (block.chainid != 31337){                // if not the anvil chain then skip the test
+            return;
+        }
+        _;
+    }
     ////////////////////////////////////////////////////////////////////
     ///////////// fullfill random words ////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,7 +277,7 @@ contract RaffleTest is Test{
        FUZZ TEST : rather than testing for all requestId we can write a FUZZ test where foundry itself tests by giving random values to requestId
     *********************************************************************************/
 
-    function testFulfilRandomWordsCanOnlyRunIfPerformUpkeepIsTrue(uint256 randomRequestId) public upKeepParametersMadeTrue{
+    function testFulfilRandomWordsCanOnlyRunIfPerformUpkeepIsTrue(uint256 randomRequestId) public upKeepParametersMadeTrue skipInCaseOfFork{
         
         vm.expectRevert("nonexistent request"); 
         // now performipkeep is not ran so now if vrfcoordinator tries to run the fullfillrandomwords it will revert
@@ -276,14 +286,14 @@ contract RaffleTest is Test{
 
 
     //testing almost complete fulfillRandomWords function in one test:
-    function testfulfillRandomWordsPicksAwinnerResetsAndSendsMoney() public{
+    function testfulfillRandomWordsPicksAwinnerResetsAndSendsMoney() public skipInCaseOfFork{
         
         //Arrange players
         uint256 totalEntrants = 5;
         uint256 startingIndex = 0;
         for(uint256 i = startingIndex; i < totalEntrants; i++){
             address player = address(uint160(i + 1));                                                       // i+1 bcoz we want all address be non zero         
-            hoax(player, STARTING_USER_BALANCE);              // cheatcode for prank plus deal
+            hoax(player, STARTING_USER_BALANCE);              // cheatcode for prank + deal
             raffle.enterRaffle{value: enteranceFee}();
         }
 

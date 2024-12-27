@@ -23,7 +23,8 @@ contract DeployRaffle is Script{
         bytes32 gasLane,                                                                                
         uint64 subscriptionId,                                                                        
         uint32 callbackGasLimit,
-        address link) = helperConfig.activeNetworkConfig();    
+        address link,
+        uint256 deployerKey) = helperConfig.activeNetworkConfig();    
 
 
         // (need only for testing) ye wale part me hum subscription create karenge:
@@ -32,12 +33,12 @@ contract DeployRaffle is Script{
             // 1. creating a subscription:
             CreateSubscription createSubscription = new CreateSubscription();
             // subscriptionId = createSubscription.run();                                        //method1: using the helperconfig in interaction script to get vrfCoordinator
-            subscriptionId = createSubscription.createSubscription(vrfCoordinator);              //method2: using the vrfCoordinator from above helperconfig                      //
+            subscriptionId = createSubscription.createSubscription(vrfCoordinator, deployerKey);              //method2: using the vrfCoordinator from above helperconfig                      //
         
 
             // 2. funding the subscription:
             FundSubscription fundSubscription = new FundSubscription();
-            fundSubscription.fundSubscription(vrfCoordinator, subscriptionId, link);
+            fundSubscription.fundSubscription(vrfCoordinator, subscriptionId, link, deployerKey);
 
 
             // adding consumer: ye kaam niche kiya hai bcoz it would be done after the raffle is deployed
@@ -53,7 +54,7 @@ contract DeployRaffle is Script{
 
         // 3. adding the deployed contract as consumer in our subscription:
         AddConsumer addConsumer = new AddConsumer();
-        addConsumer.addConsumer(address(raffle), vrfCoordinator, subscriptionId);           // here we have directly used the addConsumer function of the AddConsumer script (bcoz we have got all its required inputs here. yes we have got the latest deployed raffle contract here and dont need the devops ki bakchodi)
+        addConsumer.addConsumer(address(raffle), vrfCoordinator, subscriptionId, deployerKey);           // here we have directly used the addConsumer function of the AddConsumer script (bcoz we have got all its required inputs here. yes we have got the latest deployed raffle contract here and dont need the devops ki bakchodi)
         
         
         return (raffle, helperConfig);

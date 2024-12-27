@@ -15,8 +15,10 @@ contract HelperConfig is Script {
         uint64 subscriptionId;
         uint32 callbackGasLimit;
         address link;                    // added later for fundSubscription    // address of smart contract that manages the 'LINK token' (native cryptocurrency of chainlink network) on a specific blockchain
+        uint256 deployerKey;            // added more later to solve issue 1 of testing on forked network.
     }
 
+    uint256 public constant DEFAULT_ANVIL_PRIVATE_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;           // automatic convert from hex to uint256
     NetworkConfig public activeNetworkConfig;
 
     constructor() {
@@ -27,7 +29,7 @@ contract HelperConfig is Script {
         }
     }
 
-    function getSepoliaEthConfig() public pure returns (NetworkConfig memory) {             // pure bcoz neither it changes state nor it looks into storage
+    function getSepoliaEthConfig() public view returns (NetworkConfig memory) {            // changed from pure to view bcoz of key
         // get all these chaindependent values from the chainlink docs
         return NetworkConfig({
             enteranceFee : 0.01 ether,        // meri mrzi
@@ -36,7 +38,8 @@ contract HelperConfig is Script {
             gasLane: 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c,        // gas lane  = key hash     //https://docs.chain.link/vrf/v2/subscription/supported-networks
             subscriptionId: 1893,             // will update this with our subId    //1893 is patrick's id
             callbackGasLimit: 500000,         // meri mrzi 
-            link: 0x779877A7B0D9E8603169DdbD7836e478b4624789                               // https://docs.chain.link/resources/link-token-contracts
+            link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,                               // https://docs.chain.link/resources/link-token-contracts
+            deployerKey : vm.envUint("PRIVATE_KEY")     //using our private key as deployerKey   // cheatcode: vm.envUint() is a cheatcode that allows you to get the value of an environment variable as a uint256
         });
     }
 
@@ -67,7 +70,8 @@ contract HelperConfig is Script {
             gasLane: 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c,        // gas lane for mock doesn't matter so we can leave it like this i.e., same as in above function
             subscriptionId: 0,               //our script will add this 
             callbackGasLimit: 500000,         // meri mrzi
-            link: address(link)
+            link: address(link),
+            deployerKey: DEFAULT_ANVIL_PRIVATE_KEY
         });
     }
 
